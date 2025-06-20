@@ -12,7 +12,7 @@ const GAME_CONFIG = {
     WORLD_WIDTH: 3200,
     WORLD_HEIGHT: 600,
     BLOCK_SIZE: 32,
-    GAME_TIME: 90000,
+    GAME_TIME: 60000,
     MAX_PLAYERS: 8
 };
 
@@ -178,14 +178,21 @@ function startGame() {
 function endGame() {
     gameState.gameStarted = false;
     if (gameState.gameTimer) clearTimeout(gameState.gameTimer);
+    if (enemyInterval) {
+        clearInterval(enemyInterval);
+        enemyInterval = null;
+    }
     io.emit('gameEnd', {
         results: gameState.finishedPlayers,
         allPlayers: Object.values(gameState.players)
     });
 }
 
+let enemyInterval = null;
+
 function startEnemyUpdate() {
-    setInterval(() => {
+    if (enemyInterval) clearInterval(enemyInterval);  // 既存の interval を止める
+    enemyInterval = setInterval(() => {
         if (!gameState.gameStarted) return;
 
         gameState.enemies.forEach(enemy => {

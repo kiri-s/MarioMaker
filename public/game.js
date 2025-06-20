@@ -552,7 +552,7 @@ class Game {
         if (!this.gameStarted || !this.gameStartTime) return;
         
         const elapsed = Date.now() - this.gameStartTime;
-        const remaining = Math.max(0, 90000 - elapsed); // 5分
+        const remaining = Math.max(0, 60000 - elapsed); // 5分
         const minutes = Math.floor(remaining / 60000);
         const seconds = Math.floor((remaining % 60000) / 1000);
         
