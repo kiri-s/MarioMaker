@@ -283,10 +283,10 @@ class Game {
             }, 1000);
         });
 
-        document.getElementById('spectateButton').addEventListener('click', () => {
-            this.socket.emit('spectate');
-            document.getElementById('startScreen').style.display = 'none';
-        });
+        // document.getElementById('spectateButton').addEventListener('click', () => {
+        //     this.socket.emit('spectate');
+        //     document.getElementById('startScreen').style.display = 'none';
+        // });
     }
 
     updatePlayerMovement() {
