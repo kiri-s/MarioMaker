@@ -5,8 +5,7 @@ class Game {
         this.ctx = this.canvas.getContext('2d');
         this.minimapCanvas = document.getElementById('minimap');
         this.minimapCtx = this.minimapCanvas.getContext('2d');
-        
-        // ゲーム状態
+
         this.players = {};
         this.myPlayerId = null;
         this.course = [];
@@ -16,19 +15,18 @@ class Game {
         this.gameStarted = false;
         this.camera = { x: 0, y: 0 };
         this.keys = {};
+        this.inputLocked = false;
         this.gameStartTime = null;
-        
-        // 物理定数
+
         this.GRAVITY = 0.6;
-        this.JUMP_FORCE = -12;
+        this.JUMP_FORCE = -15;
         this.MOVE_SPEED = 4;
         this.FRICTION = 0.8;
-        
+
         this.setupCanvas();
         this.setupControls();
         this.setupSocketEvents();
         this.setupUI();
-
         this.gameLoop();
     }
 
@@ -194,6 +192,11 @@ class Game {
         this.socket.on('error', (message) => {
             alert(message);
         });
+
+        this.socket.on('playerListUpdate', (counts) => {
+            document.getElementById('playerCounts').textContent =
+                `接続人数: ${counts.total}人 / 参加待機中: ${counts.players}人 / 観戦: ${counts.spectators}人`;
+        });
     }
 
     setupUI() {
@@ -201,26 +204,30 @@ class Game {
             const playerName = document.getElementById('playerNameInput').value.trim();
             if (playerName) {
                 this.socket.emit('joinGame', playerName);
-                
-                // ✅ 参加ボタンを非表示にする処理を追加
                 document.getElementById('joinButton').style.display = 'none';
                 document.getElementById('playerNameInput').style.display = 'none';
             } else {
                 alert('プレイヤー名を入力してください');
             }
         });
+        
+        document.getElementById('cancelJoinButton').addEventListener('click', () => {
+            document.getElementById('playerNameInput').value = '';
+            document.getElementById('joinButton').style.display = 'inline-block';
+            document.getElementById('playerNameInput').style.display = 'inline-block';
+            document.getElementById('startGameButton').style.display = 'none';
+            document.getElementById('waitingMessage').style.display = 'none';
+        });
 
         document.getElementById('newGameButton').addEventListener('click', () => {
             document.getElementById('gameEndScreen').style.display = 'none';
             document.getElementById('startScreen').style.display = 'flex';
-            
-            // ✅ 再度参加ボタンと名前入力欄を表示
             document.getElementById('joinButton').style.display = 'inline-block';
             document.getElementById('playerNameInput').style.display = 'inline-block';
-
             document.getElementById('startGameButton').style.display = 'none';
             document.getElementById('waitingMessage').style.display = 'none';
         });
+
         // Enter キーでプレイヤー名入力
         document.getElementById('playerNameInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -236,6 +243,9 @@ class Game {
         });
 
         this.socket.on('countdownStart', () => {
+            document.getElementById('startScreen').style.display = 'none';
+            this.inputLocked = true;
+
             let countdown = 3;
             const countdownDiv = document.createElement('div');
             countdownDiv.id = 'countdownOverlay';
@@ -245,8 +255,8 @@ class Game {
             countdownDiv.style.transform = 'translate(-50%, -50%)';
             countdownDiv.style.fontSize = '64px';
             countdownDiv.style.color = 'white';
-            countdownDiv.style.zIndex = 2000;
             countdownDiv.style.fontWeight = 'bold';
+            countdownDiv.style.zIndex = 2000;
             countdownDiv.style.textShadow = '2px 2px 8px black';
             document.body.appendChild(countdownDiv);
 
@@ -257,12 +267,11 @@ class Game {
                 } else {
                     countdownDiv.textContent = 'GO!!';
                     clearInterval(interval);
-                    
-                    // ✅ 1秒後に消す
                     setTimeout(() => {
                         if (document.body.contains(countdownDiv)) {
                             document.body.removeChild(countdownDiv);
                         }
+                        this.inputLocked = false;
                     }, 1000);
                 }
             }, 1000);
@@ -412,23 +421,36 @@ class Game {
         });
 
         // チェックポイントを描画
-        this.checkpoints.forEach(checkpoint => {
-            this.ctx.fillStyle = '#FFD700';
-            this.ctx.fillRect(checkpoint.x, checkpoint.y, checkpoint.width, checkpoint.height);
-            
-            // チェックポイントマーク
-            this.ctx.fillStyle = '#FF6B6B';
-            this.ctx.fillRect(checkpoint.x + 8, checkpoint.y + 8, 16, 16);
-            
-            this.ctx.fillStyle = 'white';
-            this.ctx.font = '12px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(checkpoint.id.toString(), checkpoint.x + checkpoint.width/2, checkpoint.y + checkpoint.height/2 + 4);
+        this.checkpoints.forEach(cp => {
+            this.ctx.fillStyle='#FFD700'; // ポール
+            this.ctx.fillRect(cp.x, cp.y-cp.height,4,cp.height);
+            this.ctx.beginPath();          // 旗
+            this.ctx.moveTo(cp.x+4, cp.y-cp.height+4);
+            this.ctx.lineTo(cp.x+20, cp.y-cp.height+12);
+            this.ctx.lineTo(cp.x+4, cp.y-cp.height+20);
+            this.ctx.closePath();
+            this.ctx.fillStyle='#FF6B6B';
+            this.ctx.fill();
         });
 
         // 敵キャラを描画
         this.enemies.forEach(enemy => {
             if (!enemy.active) return;
+
+            if (enemy.type === 'bird') {
+                this.ctx.fillStyle = '#1E90FF'; // 鳥の色
+                this.ctx.beginPath();
+                this.ctx.ellipse(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, 16, 12, 0, 0, 2 * Math.PI);
+                this.ctx.fill();
+
+                // 翼（シンプルな羽ばたき）
+                this.ctx.strokeStyle = 'white';
+                this.ctx.beginPath();
+                this.ctx.moveTo(enemy.x + 8, enemy.y + 8);
+                this.ctx.lineTo(enemy.x + 16, enemy.y);
+                this.ctx.stroke();
+                return;
+            }
             
             this.ctx.fillStyle = '#8B4513';
             this.ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
@@ -441,6 +463,7 @@ class Game {
             this.ctx.fillStyle = 'black';
             this.ctx.fillRect(enemy.x + 7, enemy.y + 7, 2, 2);
             this.ctx.fillRect(enemy.x + 23, enemy.y + 7, 2, 2);
+
         });
 
         // プレイヤーを描画
@@ -529,7 +552,7 @@ class Game {
         if (!this.gameStarted || !this.gameStartTime) return;
         
         const elapsed = Date.now() - this.gameStartTime;
-        const remaining = Math.max(0, 300000 - elapsed); // 5分
+        const remaining = Math.max(0, 90000 - elapsed); // 5分
         const minutes = Math.floor(remaining / 60000);
         const seconds = Math.floor((remaining % 60000) / 1000);
         

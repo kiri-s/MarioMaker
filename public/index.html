@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,11 +33,11 @@
         #ui {
             position: absolute;
             top: 10px;
-            left: 10px;
+            right: 10px;
             z-index: 100;
             color: white;
             font-size: 16px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         #timer {
@@ -46,7 +47,7 @@
         }
 
         #playerList {
-            background: rgba(0,0,0,0.7);
+            background: rgba(0, 0, 0, 0.7);
             padding: 10px;
             border-radius: 5px;
             margin-bottom: 10px;
@@ -55,46 +56,14 @@
 
         #chat {
             position: absolute;
-            bottom: 10px;
+            top: 10px;
             left: 10px;
             width: 300px;
             z-index: 100;
         }
 
-        @media (max-width: 768px) {
-            #chat {
-                width: calc(100vw - 20px);
-                left: 10px;
-                right: 10px;
-            }
-            
-            #controls {
-                position: static;
-                margin: 10px;
-            }
-            
-            #minimap {
-                position: static;
-                margin: 10px;
-            }
-            
-            #ui {
-                font-size: 14px;
-            }
-        }
-
-        @media (max-height: 600px) {
-            #chat {
-                bottom: 5px;
-            }
-            
-            #chatMessages {
-                height: 100px;
-            }
-        }
-
         #chatMessages {
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 10px;
             border-radius: 5px 5px 0 0;
@@ -127,7 +96,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -141,7 +110,7 @@
             margin-bottom: 20px;
             text-align: center;
             color: #FFD700;
-            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
         }
 
         #playerNameInput {
@@ -154,7 +123,9 @@
             text-align: center;
         }
 
-        #joinButton, #startGameButton {
+        #joinButton,
+        #cancelJoinButton,
+        #startGameButton {
             padding: 12px 24px;
             font-size: 18px;
             background: #FF6B6B;
@@ -166,20 +137,16 @@
             transition: background 0.3s;
         }
 
-        #joinButton:hover, #startGameButton:hover {
+        #joinButton:hover,
+        #cancelJoinButton:hover,
+        #startGameButton:hover {
             background: #FF5252;
         }
 
-        #joinButton:disabled, #startGameButton:disabled {
+        #joinButton:disabled,
+        #startGameButton:disabled {
             background: #666;
             cursor: not-allowed;
-        }
-
-        #instructions {
-            margin-top: 30px;
-            text-align: center;
-            font-size: 14px;
-            max-width: 500px;
         }
 
         #gameEndScreen {
@@ -188,7 +155,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0, 0, 0, 0.9);
             display: none;
             flex-direction: column;
             justify-content: center;
@@ -198,7 +165,7 @@
         }
 
         #results {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             padding: 20px;
             border-radius: 10px;
             margin-bottom: 20px;
@@ -209,80 +176,42 @@
             font-size: 18px;
         }
 
-        #controls {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-        }
-
         #minimap {
             position: absolute;
-            top: 150px;
-            right: 10px;
-            width: 200px;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
             height: 50px;
-            background: rgba(0,0,0,0.7);
-            border: 2px solid white;
-            border-radius: 5px;
         }
 
         .checkpoint-reached {
             position: absolute;
-            top: 50%;
+            top: 40%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: #FFD700;
-            color: #333;
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-size: 20px;
-            font-weight: bold;
-            z-index: 200;
-            animation: checkpointAnimation 2s ease-out forwards;
-        }
-
-        @keyframes checkpointAnimation {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
-            100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
-        }
-
-        .floating-text {
-            position: absolute;
-            font-size: 14px;
+            font-size: 25px;
             font-weight: bold;
             color: #FFD700;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-            z-index: 150;
-            animation: floatUp 2s ease-out forwards;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+            animation: fadeOut 2s ease-out forwards;
         }
 
-        @keyframes floatUp {
-            0% { opacity: 1; transform: translateY(0); }
-            100% { opacity: 0; transform: translateY(-50px); }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%, -70%); }
         }
-        
     </style>
 </head>
+
 <body>
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
-        
+
         <div id="ui">
             <div id="timer">時間: --:--</div>
             <div id="playerList"></div>
-        </div>
-
-        <div id="controls">
-            <div><strong>操作方法:</strong></div>
-            <div>A/D または ←/→: 移動</div>
-            <div>W または ↑ または スペース: ジャンプ</div>
-            <div>Enter: チャット入力</div>
         </div>
 
         <canvas id="minimap"></canvas>
@@ -297,15 +226,18 @@
             <input type="text" id="playerNameInput" placeholder="プレイヤー名を入力" maxlength="15">
             <button id="joinButton">ゲームに参加</button>
             <button id="startGameButton" style="display:none;">ゲーム開始</button>
+            <button id="cancelJoinButton">キャンセル</button>
             <button id="spectateButton">観戦モードで見る</button>
+            <br>
+            <div id="playerCounts" style="margin: 10px; font-size: 16px;"></div>
+            <br>
             <div id="waitingMessage" style="display:none;">他のプレイヤーを待機中... (2人以上で開始可能)</div>
+            <br>
             <div id="instructions">
-                <p><strong>ゲームルール:</strong></p>
-                <p>・全員でゴールを目指してレース！</p>
-                <p>・敵キャラを踏んで倒そう</p>
-                <p>・チェックポイントを通過すると、そこからリスポーンできます</p>
-                <p>・ライフは無限、時間内にゴールを目指そう</p>
-                <p>・2人以上でゲーム開始可能</p>
+                <p><strong>操作方法:</strong></p>
+                <p>←/→ または A/D：移動</p>
+                <p>↑ または W または スペース：ジャンプ</p>
+                <p>Enter：チャット入力</p>
             </div>
         </div>
 
@@ -319,4 +251,5 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>
+
 </html>
