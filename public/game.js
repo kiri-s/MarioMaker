@@ -23,6 +23,8 @@ class Game {
         this.MOVE_SPEED = 4;
         this.FRICTION = 0.8;
 
+        this.particles = [];
+
         this.setupCanvas();
         this.setupControls();
         this.setupSocketEvents();
@@ -197,6 +199,10 @@ class Game {
             document.getElementById('playerCounts').textContent =
                 `接続人数: ${counts.total}人 / 参加待機中: ${counts.players}人 / 観戦: ${counts.spectators}人`;
         });
+
+        this.socket.on('dustEffect', (data) => {
+            this.spawnDust(data.x, data.y);
+        });
     }
 
     setupUI() {
@@ -289,87 +295,79 @@ class Game {
         const player = this.players[this.myPlayerId];
         if (player.finished) return;
 
-        let moveX = 0;
-        
-        // 移動入力
+        player.isJumping = player.isJumping || false;
+
+        const ACCELERATION = 0.5;
+        const MAX_SPEED = 4;
+        const airControl = player.onGround ? 1 : 0.5;
+
         if (this.keys['a'] || this.keys['arrowleft']) {
-            moveX = -this.MOVE_SPEED;
+            player.velocityX -= ACCELERATION * airControl;
         }
         if (this.keys['d'] || this.keys['arrowright']) {
-            moveX = this.MOVE_SPEED;
+            player.velocityX += ACCELERATION * airControl;
         }
 
-        // ジャンプ入力
-        if ((this.keys['w'] || this.keys['arrowup'] || this.keys[' ']) && player.onGround) {
-            player.velocityY = this.JUMP_FORCE;
-            player.onGround = false;
+        if (!(this.keys['a'] || this.keys['arrowleft'] || this.keys['d'] || this.keys['arrowright'])) {
+            player.velocityX *= this.FRICTION;
         }
 
-        // 横移動
-        player.velocityX = moveX;
+        player.velocityX = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.velocityX));
 
-        // 重力適用
-        if (!player.onGround) {
-            player.velocityY += this.GRAVITY;
+        const CHARGE_DELAY = 500; // チャージ開始の遅延(ms)
+        const MAX_CHARGE = 20;
+        const BASE_JUMP_FORCE = this.JUMP_FORCE; // 基本ジャンプ力
+
+        if ((this.keys[' '] || this.keys['w'] || this.keys['arrowup'])) {
+            if (player.onGround && !player.isJumping) {
+                player.velocityY = this.JUMP_FORCE;
+                player.isJumping = true;
+                player.onGround = false;
+            }
+        } else {
+            if (player.isJumping && player.velocityY < -6) {
+                // ジャンプ途中でキーを離した場合、上昇を制限
+                player.velocityY = -6;
+            }
         }
 
-        // 位置更新
+        if (!player.onGround) player.velocityY += this.GRAVITY;
+
         player.x += player.velocityX;
         player.y += player.velocityY;
 
-        // 地面との衝突判定
         player.onGround = false;
         this.course.forEach(block => {
             if (block.type === 'ground' || block.type === 'platform') {
                 if (this.checkBlockCollision(player, block)) {
-                    // 上から衝突（地面に着地）
                     if (player.velocityY > 0 && player.y < block.y) {
                         player.y = block.y - player.height;
                         player.velocityY = 0;
                         player.onGround = true;
-                    }
-                    // 下から衝突（天井）
-                    else if (player.velocityY < 0 && player.y > block.y) {
+                        player.isJumping = false;  // 着地したらジャンプ状態リセット
+                    } else if (player.velocityY < 0 && player.y > block.y) {
                         player.y = block.y + block.height;
                         player.velocityY = 0;
-                    }
-                    // 左右の衝突
-                    else if (player.velocityX > 0 && player.x < block.x) {
+                    } else if (player.velocityX > 0 && player.x < block.x) {
                         player.x = block.x - player.width;
-                    }
-                    else if (player.velocityX < 0 && player.x > block.x) {
+                        player.velocityX = 0;
+                    } else if (player.velocityX < 0 && player.x > block.x) {
                         player.x = block.x + block.width;
+                        player.velocityX = 0;
                     }
                 }
             }
         });
 
-        // 世界の境界
-        if (player.x < 0) player.x = 0;
-        if (player.x > this.gameConfig.WORLD_WIDTH - player.width) {
-            player.x = this.gameConfig.WORLD_WIDTH - player.width;
-        }
+        player.x = Math.max(0, Math.min(player.x, this.gameConfig.WORLD_WIDTH - player.width));
         if (player.y > this.gameConfig.WORLD_HEIGHT) {
-            // 奈落に落下した場合のリスポーン
-            this.socket.emit('playerMove', {
-                x: player.x,
-                y: player.y,
-                velocityX: player.velocityX,
-                velocityY: player.velocityY,
-                onGround: player.onGround
-            });
+            this.socket.emit('playerMove', player);
             return;
         }
 
-        // サーバーに移動データを送信
-        this.socket.emit('playerMove', {
-            x: player.x,
-            y: player.y,
-            velocityX: player.velocityX,
-            velocityY: player.velocityY,
-            onGround: player.onGround
-        });
+        this.socket.emit('playerMove', player);
     }
+
 
     checkBlockCollision(player, block) {
         return player.x < block.x + block.width &&
@@ -384,12 +382,64 @@ class Game {
         const player = this.players[this.myPlayerId];
         
         // カメラをプレイヤーに追従
-        this.camera.x = player.x - this.canvas.width / 2;
-        this.camera.y = player.y - this.canvas.height / 2;
+        const targetX = player.x - this.canvas.width / 2;
+        const targetY = player.y - this.canvas.height / 2;
+
+        // イージング（0.05 は追従の速さ、調整可能）
+        this.camera.x += (targetX - this.camera.x) * 0.05;
+        this.camera.y += (targetY - this.camera.y) * 0.05;
 
         // カメラの境界制限
         this.camera.x = Math.max(0, Math.min(this.camera.x, this.gameConfig.WORLD_WIDTH - this.canvas.width));
         this.camera.y = Math.max(0, Math.min(this.camera.y, this.gameConfig.WORLD_HEIGHT - this.canvas.height));
+    }
+
+    spawnDust(x, y) {
+        for (let i = 0; i < 5; i++) {
+            this.particles.push({
+                x: x + Math.random() * 10 - 5,
+                y: y,
+                vx: (Math.random() - 0.5) * 2,
+                vy: -Math.random() * 2,
+                life: 30
+            });
+        }
+    }
+
+    spawnChargeEffect(x, y) {
+        for (let i = 0; i < 3; i++) {
+            this.particles.push({
+                x: x + Math.random() * 8 - 4,
+                y: y + Math.random() * 8 - 4,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: (Math.random() - 0.5) * 0.5,
+                life: 15,
+                color: 'rgba(255,215,0,0.8)' // ゴールド光
+            });
+        }
+    }
+
+    adjustColorBrightness(hex, amt) {
+        if (hex[0] === '#') {
+            hex = hex.slice(1);
+        }
+
+        let num = parseInt(hex, 16);
+
+        let r = (num >> 16) + amt;
+        let g = ((num >> 8) & 0x00FF) + amt;
+        let b = (num & 0x0000FF) + amt;
+
+        r = Math.max(Math.min(255, r), 0);
+        g = Math.max(Math.min(255, g), 0);
+        b = Math.max(Math.min(255, b), 0);
+
+        return (
+            '#' +
+            r.toString(16).padStart(2, '0') +
+            g.toString(16).padStart(2, '0') +
+            b.toString(16).padStart(2, '0')
+        );
     }
 
     render() {
@@ -468,27 +518,52 @@ class Game {
 
         // プレイヤーを描画
         Object.values(this.players).forEach(player => {
-            // プレイヤー本体
-            this.ctx.fillStyle = player.color;
-            this.ctx.fillRect(player.x, player.y, player.width, player.height);
-            
-            // プレイヤーの目
+            const centerX = player.x + player.width / 2;
+            const centerY = player.y + player.height / 2;
+            const radius = player.width / 2;
+
+            // メタリックグラデーション（プレイヤー色ベース）
+            const lightColor = this.adjustColorBrightness(player.color, 60);
+            const darkColor = this.adjustColorBrightness(player.color, -60);
+
+            const gradient = this.ctx.createRadialGradient(
+                centerX, centerY, radius * 0.2,
+                centerX, centerY, radius
+            );
+            gradient.addColorStop(0, lightColor);
+            gradient.addColorStop(0.5, player.color);
+            gradient.addColorStop(1, darkColor);
+
+            this.ctx.fillStyle = gradient;
+            this.ctx.beginPath();
+            this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // 目
             this.ctx.fillStyle = 'white';
-            this.ctx.fillRect(player.x + 6, player.y + 6, 6, 6);
-            this.ctx.fillRect(player.x + 20, player.y + 6, 6, 6);
-            
+            this.ctx.beginPath();
+            this.ctx.arc(centerX - 5, centerY - 3, 2, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.beginPath();
+            this.ctx.arc(centerX + 5, centerY - 3, 2, 0, Math.PI * 2);
+            this.ctx.fill();
+
             this.ctx.fillStyle = 'black';
-            this.ctx.fillRect(player.x + 8, player.y + 8, 2, 2);
-            this.ctx.fillRect(player.x + 22, player.y + 8, 2, 2);
-            
+            this.ctx.beginPath();
+            this.ctx.arc(centerX - 5, centerY - 3, 1, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.beginPath();
+            this.ctx.arc(centerX + 5, centerY - 3, 1, 0, Math.PI * 2);
+            this.ctx.fill();
+
             // プレイヤー名
             this.ctx.fillStyle = 'white';
             this.ctx.font = '12px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.strokeStyle = 'black';
             this.ctx.lineWidth = 2;
-            this.ctx.strokeText(player.name, player.x + player.width/2, player.y - 5);
-            this.ctx.fillText(player.name, player.x + player.width/2, player.y - 5);
+            this.ctx.strokeText(player.name, centerX, player.y - 5);
+            this.ctx.fillText(player.name, centerX, player.y - 5);
             
             // ゴール済みプレイヤーには王冠
             if (player.finished) {
@@ -496,6 +571,23 @@ class Game {
                 this.ctx.fillText('👑', player.x + player.width/2, player.y - 20);
             }
         });
+
+        // 他プレイヤーも土煙表示
+        Object.values(this.players).forEach(player => {
+            if (player.onGround && Math.abs(player.velocityX) > 0.5) {
+                this.spawnDust(player.x + player.width / 2, player.y + player.height);
+            }
+        });
+
+        this.particles.forEach(p => {
+            this.ctx.fillStyle = p.color || 'rgba(150,150,150,0.7)';
+            this.ctx.fillRect(p.x, p.y, 3, 3);
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.1;
+            p.life--;
+        });
+        this.particles = this.particles.filter(p => p.life > 0);
 
         this.ctx.restore();
 

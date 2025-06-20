@@ -37,7 +37,9 @@ function generateCourse() {
     // 地面（穴あり）
     for (let x = 0; x < GAME_CONFIG.WORLD_WIDTH; x += GAME_CONFIG.BLOCK_SIZE) {
         if (Math.random() < 0.1) {
-            x += GAME_CONFIG.BLOCK_SIZE * 2;
+            const holeWidth = GAME_CONFIG.BLOCK_SIZE * (3 + Math.floor(Math.random() * 6)); 
+            // 3～5ブロック分の穴
+            x += holeWidth;
             continue;
         }
         for (let y = GAME_CONFIG.WORLD_HEIGHT - GAME_CONFIG.BLOCK_SIZE * 2; y < GAME_CONFIG.WORLD_HEIGHT; y += GAME_CONFIG.BLOCK_SIZE) {
@@ -73,7 +75,7 @@ function generateCourse() {
         checkpoints.push({
             x: checkpointX,
             y: GAME_CONFIG.WORLD_HEIGHT - GAME_CONFIG.BLOCK_SIZE * 3,
-            width: GAME_CONFIG.BLOCK_SIZE,
+            width: GAME_CONFIG.BLOCK_SIZE * 2,
             height: GAME_CONFIG.BLOCK_SIZE * 3,
             id: i
         });
@@ -457,13 +459,36 @@ io.on('connection', (socket) => {
     socket.on('playerMove', (data) => {
         const p = gameState.players[socket.id];
         if (!p || gameState.gameStarted === false || p.finished || p.isSpectator) return;
+
         p.x = data.x;
         p.y = data.y;
         p.velocityX = data.velocityX;
         p.velocityY = data.velocityY;
         p.onGround = data.onGround;
+
+        // 土煙の発生判定（onGroundで速度が一定以上、かつクールダウン中でない場合）
+        if (p.onGround && Math.abs(p.velocityX) > 0.5) {
+            if (!p.dustCooldown || p.dustCooldown <= 0) {
+                io.emit('dustEffect', {
+                    x: p.x + p.width / 2,
+                    y: p.y + p.height
+                });
+                p.dustCooldown = 10; // 10 フレーム程度クールダウン
+            }
+        }
+
+        if (p.dustCooldown > 0) {
+            p.dustCooldown--;
+        }
+
         checkCollisions(p);
-        socket.broadcast.emit('playerUpdate', { playerId: socket.id, x: p.x, y: p.y, velocityX: p.velocityX, velocityY: p.velocityY });
+        socket.broadcast.emit('playerUpdate', {
+            playerId: socket.id,
+            x: p.x,
+            y: p.y,
+            velocityX: p.velocityX,
+            velocityY: p.velocityY
+        });
     });
 
     socket.on('playerReady', () => {
