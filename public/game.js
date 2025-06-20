@@ -207,7 +207,7 @@ class Game {
 
     setupUI() {
         document.getElementById('joinButton').addEventListener('click', () => {
-            const playerName = document.getElementById('playerNameInput').value.trim();
+            const playerName = document.getElementById('playerNameInput').value.trim().substring(0, 15);
             if (playerName) {
                 this.socket.emit('joinGame', playerName);
                 document.getElementById('joinButton').style.display = 'none';
